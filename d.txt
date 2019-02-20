@@ -1,0 +1,2 @@
+http://app.addsflyer.com/track.php?page=Campaigns&user_group=all&group=2&traffic_source=all&date=1&api_key=10000019964752f78b22ab8c2ef7aa89f6d90b5
+http://app.addsflyer.com/track.php?page=Stats&camp_id=1755&api_key=10000019964752f78b22ab8c2ef7aa89f6d90b5
