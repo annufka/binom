@@ -4,41 +4,99 @@ import config
 import requests
 import json
 import time
+import sqlite3
 
+class DB:
+    """
+    класс для работы с базой данных
+    """
+    def __init__(self, db_name):
+        self.db_name = db_name
+        self.conn = sqlite3.connect(self.db_name)
+        self.cursor = self.conn.cursor()
+
+    #создание таблицы
+    def create_table(self):
+        self.cursor.execute("CREATE TABLE Users (id_user INTEGER PRIMARY KEY, api_key TEXT, group INTEGER, last_msg TEXT)")
+        self.conn.commit()
+
+    #добавление начальных данных (ид пользователя и группа для сортировки)
+    def add_user(self, user, api, group):
+        self.cursor.execute("INSERT INTO Users (id_user, api_key, group) VALUES (?, ?)", (user, api, group))
+        self.conn.commit()
+
+    #добавим tuple из последней компании и плохой площадки, чтобы не повторять сообщения
+    def add_msg(self, list_of_companies, user):
+        last_db = cursor.execute("SELECT last_msg FROM Users WHERE id_user=?", (user))
+        list_of_companies = last_db + list_of_companies
+        self.cursor.execute("UPDATE Users SET last_msg=? WHERE name=?", (list_of_companies, user))
+        self.conn.commit()
+
+    #возвращаем колонку ключей
+    def get_api(self, user):
+        return self.cursor.execute("SELECT api_key FROM Users WHERE id_user=?", (user))
+
+    #возвращаем колонку номера группы
+    def get_num_group(self, user):
+        return self.cursor.execute("SELECT group FROM Users WHERE id_user=?", (user))
+
+    #возвращаем колонку сообщений
+    def get_last(self, user):
+        return self.cursor.execute("SELECT last_msg FROM Users WHERE id_user=?", (user))
+
+    #очищаем колонку с сообщениями раз в сутки
+    def del_last_msg(self):
+        self.cursor.execute("UPDATE Users SET last_msg = NULL")
+        self.conn.commit()
+
+#экземпляр класса, чтобы создать бота
 bot = telebot.TeleBot(config.token)
 bot_info = bot.get_me()
 
+
+#комманда старт
 @bot.message_handler(commands=['start'])
 def handle_start_help(message):
-    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    keyboard.add("Привет")
-    msg = bot.send_message(message.chat.id, 'Давай приступим', reply_markup=keyboard)
-    bot.register_next_step_handler(msg, send_msg)
+    markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
+    markup.add("OK")
+    msg = bot.send_message(message.chat.id, "Давай приступим", reply_markup=markup)
+    bot.register_next_step_handler(msg, first)
+
+def first(message):
+    user_key = bot.send_message(message.chat.id, "Введи свой ключ")
+    user_sort = bot.send_message(message.chat.id, "Введи число для сортировки по человеку")
+    class_db.add_user(message.chat.id, user_key, user_sort)
+    bot.register_next_step_handler("Принято, мой повелитель", send_msg)
 
 def send_msg(message):
     while True:
-        check(collect(), message)
-        time.sleep(600)
+        dateSTR = datetime.datetime.now().strftime("%H:%M:%S")
+        if dateSTR >= "22:57:00" and dateSTR <= "23:02:00":
+            class_db.del_last_msg()
+        else:
+            check(collect(message), message)
+            time.sleep(600)
 
-def collect():
-    get_collect = requests.get("&".join(config.adr))
+#собираем компании
+def collect(message):
+    get_collect = requests.get(config.url + config.user_group + "&group=" + class_db.get_num_group(message.chat.id) + config.traffic_source + config.date + config.status + class_db.get_api(message.chat.id))
     result = get_collect.json()
     dict_id = []
     for item in range(len(result)):
         dict_id.append((result[item]["id"], result[item]["name"]))
     return dict_id
 
-last_msg=[]
+#проверяем площадки
 def check(dict_id, message):
     for i in range(len(dict_id)):
-        get_check = requests.get(config.url_campeign + "&camp_id=" + dict_id[i][0] + "&order_name=&order_type=ASC&group1=27&group2=1&group3=1&" + config.api_key)
+        get_check = requests.get(config.url_campeign + "&camp_id=" + dict_id[i][0] + "&order_name=&order_type=ASC&group1=27&group2=1&group3=1&" + class_db.get_api(message.chat.id))
         all_list = get_check.json()
         for item in range(len(all_list)):
             try:
                 if int(all_list[item]["leads"]) > 25 or (int(all_list[item]["clicks"]) > 1000 and int(all_list[item]["leads"] == 0)):
-                    if (dict_id[i][0], all_list[item]["name"]) not in last_msg:         
+                    if (dict_id[i][0], all_list[item]["name"]) not in class_db.get_last(message.chat.id):
                         send(dict_id[i][0], all_list[item]["name"], all_list[item]["clicks"], all_list[item]["leads"], message)
-                        last_msg.append((dict_id[i][0], all_list[item]["name"]))
+                        class_db.add_msg((dict_id[i][0], all_list[item]["name"]), message.chat.id)
             except:
                 pass
 
@@ -47,4 +105,9 @@ def send(id_campain, name, clicks, leads, message):
     
 
 if __name__ == '__main__':
-     bot.polling(none_stop=True)
+    class_db = DB("admin_default")
+    try:
+        class_db.create_table()
+    except:
+        pass
+    bot.polling(none_stop=True)
