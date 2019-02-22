@@ -34,10 +34,13 @@ def check(dict_id, message):
         get_check = requests.get(config.url_campeign + "&camp_id=" + dict_id[i][0] + "&order_name=&order_type=ASC&group1=27&group2=1&group3=1&" + config.api_key)
         all_list = get_check.json()
         for item in range(len(all_list)):
-            if int(all_list[item]["leads"]) > 25 or (int(all_list[item]["clicks"]) > 1000 and int(all_list[item]["leads"] == 0)):
-                if (dict_id[i][0], all_list[item]["name"]) not in last_msg:         
-                    send(dict_id[i][0], all_list[item]["name"], all_list[item]["clicks"], all_list[item]["leads"], message)
-                    last_msg.append((dict_id[i][0], all_list[item]["name"]))
+            try:
+                if int(all_list[item]["leads"]) > 25 or (int(all_list[item]["clicks"]) > 1000 and int(all_list[item]["leads"] == 0)):
+                    if (dict_id[i][0], all_list[item]["name"]) not in last_msg:         
+                        send(dict_id[i][0], all_list[item]["name"], all_list[item]["clicks"], all_list[item]["leads"], message)
+                        last_msg.append((dict_id[i][0], all_list[item]["name"]))
+            except:
+                pass
 
 def send(id_campain, name, clicks, leads, message):
     bot.send_message(message.chat.id, "В компании с id - '{}' найдена подозрительная площадка '{}' c clicks - {} и leads - {}".format(id_campain, name, clicks, leads))
