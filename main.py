@@ -5,6 +5,7 @@ import requests
 import json
 import time
 import sqlite3
+import datetime
 
 class DB:
     """
@@ -12,24 +13,29 @@ class DB:
     """
     def __init__(self, db_name):
         self.db_name = db_name
-        self.conn = sqlite3.connect(self.db_name)
+        self.conn = sqlite3.connect(self.db_name, check_same_thread = False)
         self.cursor = self.conn.cursor()
 
     #создание таблицы
     def create_table(self):
-        self.cursor.execute("CREATE TABLE Users (id_user INTEGER PRIMARY KEY, api_key TEXT, group INTEGER, last_msg TEXT)")
+        self.cursor.execute("CREATE TABLE Users (id_user TEXT PRIMARY KEY, api_key TEXT, group TEXT, last_msg TEXT)")
         self.conn.commit()
 
-    #добавление начальных данных (ид пользователя и группа для сортировки)
-    def add_user(self, user, api, group):
-        self.cursor.execute("INSERT INTO Users (id_user, api_key, group) VALUES (?, ?)", (user, api, group))
+    #добавление начальных данных (ид пользователя и api)
+    def add_user(self, user, api):
+        self.cursor.execute("INSERT INTO Users (id_user, api_key) VALUES (?, ?)", (user, api))
         self.conn.commit()
 
+    #добавление начальных данных (исло для сортировки)
+    def add_id_group(self, user, id_group):
+        self.cursor.execute("UPDATE Users SET group=? WHERE id_user=?", (id_group, user))
+        self.conn.commit()
+        
     #добавим tuple из последней компании и плохой площадки, чтобы не повторять сообщения
     def add_msg(self, list_of_companies, user):
         last_db = cursor.execute("SELECT last_msg FROM Users WHERE id_user=?", (user))
         list_of_companies = last_db + list_of_companies
-        self.cursor.execute("UPDATE Users SET last_msg=? WHERE name=?", (list_of_companies, user))
+        self.cursor.execute("UPDATE Users SET last_msg=? WHERE id_user=?", (list_of_companies, user))
         self.conn.commit()
 
     #возвращаем колонку ключей
@@ -46,7 +52,7 @@ class DB:
 
     #очищаем колонку с сообщениями раз в сутки
     def del_last_msg(self):
-        self.cursor.execute("UPDATE Users SET last_msg = NULL")
+        self.cursor.execute("UPDATE Users SET last_msg = ''")
         self.conn.commit()
 
 #экземпляр класса, чтобы создать бота
@@ -64,9 +70,15 @@ def handle_start_help(message):
 
 def first(message):
     user_key = bot.send_message(message.chat.id, "Введи свой ключ")
+    bot.send_message(user_key.chat.id, message.text)
+    #bot.register_next_step_handler(class_db.add_user(message.chat.id, user_key), second)
+
+
+def second(message):
     user_sort = bot.send_message(message.chat.id, "Введи число для сортировки по человеку")
-    class_db.add_user(message.chat.id, user_key, user_sort)
+    class_db.add_id_group(message.chat.id, user_sort)
     bot.register_next_step_handler("Принято, мой повелитель", send_msg)
+
 
 def send_msg(message):
     while True:
@@ -105,7 +117,7 @@ def send(id_campain, name, clicks, leads, message):
     
 
 if __name__ == '__main__':
-    class_db = DB("admin_default")
+    class_db = DB("binom.db")
     try:
         class_db.create_table()
     except:
