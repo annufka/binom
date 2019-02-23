@@ -70,17 +70,15 @@ def handle_start_help(message):
 
 def first(message):
     user_key = bot.send_message(message.chat.id, "Введи свой ключ")
-    bot.send_message(user_key.chat.id, message.text)
-    #bot.register_next_step_handler(class_db.add_user(message.chat.id, user_key), second)
-
+    bot.register_next_step_handler("Внес в базу", second)
 
 def second(message):
+    class_db.add_user(message.chat.id, message)
     user_sort = bot.send_message(message.chat.id, "Введи число для сортировки по человеку")
-    class_db.add_id_group(message.chat.id, user_sort)
     bot.register_next_step_handler("Принято, мой повелитель", send_msg)
 
-
 def send_msg(message):
+    class_db.add_id_group(message.chat.id, message)
     while True:
         dateSTR = datetime.datetime.now().strftime("%H:%M:%S")
         if dateSTR >= "22:57:00" and dateSTR <= "23:02:00":
