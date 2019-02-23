@@ -15,40 +15,49 @@ class DB:
         self.db_name = db_name
         self.conn = sqlite3.connect(self.db_name, check_same_thread = False)
         self.cursor = self.conn.cursor()
+        self.conn.text_factory = sqlite3.OptimizedUnicode
 
     #создание таблицы
     def create_table(self):
-        self.cursor.execute("CREATE TABLE Users (id_user TEXT PRIMARY KEY, api_key TEXT, group TEXT, last_msg TEXT)")
+        self.cursor.execute("CREATE TABLE IF NOT EXISTS Users (id_user TEXT PRIMARY KEY, api_key TEXT, id_group TEXT, last_msg TEXT)")
         self.conn.commit()
 
     #добавление начальных данных (ид пользователя и api)
     def add_user(self, user, api):
-        self.cursor.execute("INSERT INTO Users (id_user, api_key) VALUES (?, ?)", (user, api))
+        self.cursor.execute("INSERT OR IGNORE INTO Users (id_user, api_key) VALUES (?, ?)", (str(user), api))
         self.conn.commit()
 
-    #добавление начальных данных (исло для сортировки)
-    def add_id_group(self, user, id_group):
-        self.cursor.execute("UPDATE Users SET group=? WHERE id_user=?", (id_group, user))
+    #добавление начальных данных (число для сортировки)
+    def add_id_group(self, user, group_input):
+        self.cursor.execute("UPDATE Users SET id_group=? WHERE id_user=?", (group_input, user))
         self.conn.commit()
         
     #добавим tuple из последней компании и плохой площадки, чтобы не повторять сообщения
     def add_msg(self, list_of_companies, user):
-        last_db = cursor.execute("SELECT last_msg FROM Users WHERE id_user=?", (user))
+        last_db = cursor.execute("SELECT last_msg FROM Users WHERE id_user=?", [user]).fetchall()[0]
         list_of_companies = last_db + list_of_companies
         self.cursor.execute("UPDATE Users SET last_msg=? WHERE id_user=?", (list_of_companies, user))
         self.conn.commit()
 
     #возвращаем колонку ключей
     def get_api(self, user):
-        return self.cursor.execute("SELECT api_key FROM Users WHERE id_user=?", (user))
+        self.cursor.execute("SELECT api_key FROM Users WHERE id_user=?", [user])
+        return_key = str(self.cursor.fetchall()[0])
+        return_key = return_key.replace("('","").replace("',)","")
+        return return_key
 
     #возвращаем колонку номера группы
     def get_num_group(self, user):
-        return self.cursor.execute("SELECT group FROM Users WHERE id_user=?", (user))
+        self.cursor.execute("SELECT id_group FROM Users WHERE id_user=?", [user])
+        return_group = str(self.cursor.fetchall()[0])
+        return_group = return_key.replace("('","").replace("',)","")
+        return return_group
 
     #возвращаем колонку сообщений
     def get_last(self, user):
-        return self.cursor.execute("SELECT last_msg FROM Users WHERE id_user=?", (user))
+        self.cursor.executemany("SELECT last_msg FROM Users WHERE id_user=?", [user])
+        return_msg = str(self.cursor.fetchall())
+        return return_msg
 
     #очищаем колонку с сообщениями раз в сутки
     def del_last_msg(self):
@@ -58,11 +67,13 @@ class DB:
 #экземпляр класса, чтобы создать бота
 bot = telebot.TeleBot(config.token)
 bot_info = bot.get_me()
+class_db = DB("binom.db")
 
 
 #комманда старт
 @bot.message_handler(commands=['start'])
 def handle_start_help(message):
+    class_db.create_table()
     markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
     markup.add("OK")
     msg = bot.send_message(message.chat.id, "Давай приступим", reply_markup=markup)
@@ -70,15 +81,15 @@ def handle_start_help(message):
 
 def first(message):
     user_key = bot.send_message(message.chat.id, "Введи свой ключ")
-    bot.register_next_step_handler("Внес в базу", second)
+    bot.register_next_step_handler(message, second)
 
 def second(message):
-    class_db.add_user(message.chat.id, message)
+    class_db.add_user(message.chat.id, message.text)
     user_sort = bot.send_message(message.chat.id, "Введи число для сортировки по человеку")
-    bot.register_next_step_handler("Принято, мой повелитель", send_msg)
+    bot.register_next_step_handler(message, send_msg)
 
 def send_msg(message):
-    class_db.add_id_group(message.chat.id, message)
+    class_db.add_id_group(message.chat.id, message.text)
     while True:
         dateSTR = datetime.datetime.now().strftime("%H:%M:%S")
         if dateSTR >= "22:57:00" and dateSTR <= "23:02:00":
@@ -115,9 +126,4 @@ def send(id_campain, name, clicks, leads, message):
     
 
 if __name__ == '__main__':
-    class_db = DB("binom.db")
-    try:
-        class_db.create_table()
-    except:
-        pass
     bot.polling(none_stop=True)
