@@ -22,9 +22,10 @@ class DB:
         self.cursor.execute("CREATE TABLE IF NOT EXISTS Users (id_user TEXT PRIMARY KEY, api_key TEXT, id_group TEXT, last_msg TEXT)")
         self.conn.commit()
 
-    #добавление начальных данных (ид пользователя и api)
+    #добавление начальных данных (ид пользователя и api, message)
     def add_user(self, user, api):
-        self.cursor.execute("INSERT OR IGNORE INTO Users (id_user, api_key) VALUES (?, ?)", (str(user), api))
+        empty_msg = ""
+        self.cursor.execute("INSERT OR IGNORE INTO Users (id_user, api_key, last_msg) VALUES (?, ?, ?)", (str(user), api, empty_msg))
         self.conn.commit()
 
     #добавление начальных данных (число для сортировки)
@@ -34,7 +35,7 @@ class DB:
         
     #добавим tuple из последней компании и плохой площадки, чтобы не повторять сообщения
     def add_msg(self, list_of_companies, user):
-        last_db = cursor.execute("SELECT last_msg FROM Users WHERE id_user=?", [user]).fetchall()[0]
+        last_db = self.cursor.execute("SELECT last_msg FROM Users WHERE id_user=?", [user]).fetchall()[0]
         list_of_companies = last_db + list_of_companies
         self.cursor.execute("UPDATE Users SET last_msg=? WHERE id_user=?", (list_of_companies, user))
         self.conn.commit()
@@ -50,13 +51,14 @@ class DB:
     def get_num_group(self, user):
         self.cursor.execute("SELECT id_group FROM Users WHERE id_user=?", [user])
         return_group = str(self.cursor.fetchall()[0])
-        return_group = return_key.replace("('","").replace("',)","")
+        return_group = return_group.replace("('","").replace("',)","")
         return return_group
 
     #возвращаем колонку сообщений
     def get_last(self, user):
-        self.cursor.executemany("SELECT last_msg FROM Users WHERE id_user=?", [user])
-        return_msg = str(self.cursor.fetchall())
+        self.cursor.execute("SELECT last_msg FROM Users WHERE id_user=?", [user])
+        return_msg = str(self.cursor.fetchall()[0])
+        return_msg = return_msg.replace("('","").replace("',)","")
         return return_msg
 
     #очищаем колонку с сообщениями раз в сутки
@@ -110,19 +112,25 @@ def collect(message):
 #проверяем площадки
 def check(dict_id, message):
     for i in range(len(dict_id)):
-        get_check = requests.get(config.url_campeign + "&camp_id=" + dict_id[i][0] + "&order_name=&order_type=ASC&group1=27&group2=1&group3=1&" + class_db.get_api(message.chat.id))
+        get_check = requests.get(config.url_campaign + "&camp_id=" + dict_id[i][0] + "&order_name=&order_type=ASC&group1=27&group2=1&group3=1&" + class_db.get_api(message.chat.id))
         all_list = get_check.json()
         for item in range(len(all_list)):
             try:
                 if int(all_list[item]["leads"]) > 25 or (int(all_list[item]["clicks"]) > 1000 and int(all_list[item]["leads"] == 0)):
-                    if (dict_id[i][0], all_list[item]["name"]) not in class_db.get_last(message.chat.id):
-                        send(dict_id[i][0], all_list[item]["name"], all_list[item]["clicks"], all_list[item]["leads"], message)
-                        class_db.add_msg((dict_id[i][0], all_list[item]["name"]), message.chat.id)
+                    """
+                    all_msg = class_db.get_last(message.chat.id)
+                    for_me = str(dict_id[i][0], all_list[item]["name"])
+                    if for_me in all_msg:
+                        pass
+                    else:
+                    """
+                    send(dict_id[i][0], dict_id[i][1], all_list[item]["name"], all_list[item]["clicks"], all_list[item]["leads"], message)
+                    class_db.add_msg((dict_id[i][0], all_list[item]["name"]), message.chat.id)
             except:
                 pass
 
-def send(id_campain, name, clicks, leads, message):
-    bot.send_message(message.chat.id, "В компании с id - '{}' найдена подозрительная площадка '{}' c clicks - {} и leads - {}".format(id_campain, name, clicks, leads))
+def send(id_campaign, name_campaign, name, clicks, leads, message):
+    bot.send_message(message.chat.id, "В компании ({}) {} найдена подозрительная площадка '{}' c clicks - {} и leads - {}".format(id_campaign, name_campaign, name, clicks, leads))
     
 
 if __name__ == '__main__':

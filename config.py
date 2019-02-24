@@ -9,4 +9,4 @@ date = "&date=1"
 status = "&status=2"
 api_key = "&api_key=10000019964752f78b22ab8c2ef7aa89f6d90b5"
 
-url_campeign = "http://app.addsflyer.com/track.php?page=Stats"
+url_campaign = "http://app.addsflyer.com/track.php?page=Stats"
