@@ -33,10 +33,10 @@ class DB:
         self.cursor.execute("UPDATE Users SET id_group=? WHERE id_user=?", (group_input, user))
         self.conn.commit()
         
-    #добавим tuple из последней компании и плохой площадки, чтобы не повторять сообщения
+    #добавим последнюю компанию и плохую площадку, чтобы не повторять сообщения
     def add_msg(self, list_of_companies, user):
         last_db = self.cursor.execute("SELECT last_msg FROM Users WHERE id_user=?", [user]).fetchall()[0]
-        list_of_companies = last_db + list_of_companies
+        list_of_companies = last_db + ', ' + str(list_of_companies[0]) + ', ' + str(list_of_companies[1])
         self.cursor.execute("UPDATE Users SET last_msg=? WHERE id_user=?", (list_of_companies, user))
         self.conn.commit()
 
@@ -117,15 +117,13 @@ def check(dict_id, message):
         for item in range(len(all_list)):
             try:
                 if int(all_list[item]["leads"]) > 25 or (int(all_list[item]["clicks"]) > 1000 and int(all_list[item]["leads"] == 0)):
-                    """
                     all_msg = class_db.get_last(message.chat.id)
-                    for_me = str(dict_id[i][0], all_list[item]["name"])
+                    for_me = str(dict_id[i][0]) + ', ' + str(all_list[item]["name"])
                     if for_me in all_msg:
                         pass
                     else:
-                    """
-                    send(dict_id[i][0], dict_id[i][1], all_list[item]["name"], all_list[item]["clicks"], all_list[item]["leads"], message)
-                    class_db.add_msg((dict_id[i][0], all_list[item]["name"]), message.chat.id)
+                        send(dict_id[i][0], dict_id[i][1], all_list[item]["name"], all_list[item]["clicks"], all_list[item]["leads"], message)
+                        class_db.add_msg((dict_id[i][0], all_list[item]["name"]), message.chat.id)
             except:
                 pass
 
